@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シンプルHTMLビューア</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #result {
+            margin-top: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 15px;
+            overflow: auto;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .cors-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fffce0;
+            border: 1px solid #e6dca0;
+            border-radius: 4px;
+        }
+        .proxy-notice {
+            background-color: #ffeeee;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 4px;
+            border: 1px solid #ffcccc;
+        }
+        .step {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            overflow: auto;
+            max-height: 500px;
+        }
+        .tab-buttons {
+            margin-bottom: 15px;
+        }
+        .tab-button {
+            padding: 8px 15px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: none;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab-button.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tontonフィルター</h1>
+        
+        <div class="proxy-notice">
+            <div class="step">重要: 初回利用時の手順</div>
+            <ol>
+                <li>初めて使用する場合は、<a href="https://cors-anywhere.herokuapp.com/" target="_blank">CORS Anywhere</a>にアクセスしてください</li>
+                <li>ページ内の「Request temporary access to the demo server」ボタンをクリックしてください</li>
+                <li>「You currently have temporary access to the demo server」と表示されたら、このページに戻ってご利用ください</li>
+            </ol>
+            <p>※ この許可は一時的なもので、数時間〜数日で期限切れになる可能性があります</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="url-input">URL:</label>
+            <input type="text" id="url-input" placeholder="https://example.com">
+        </div>
+        
+        <div>
+            <button id="fetch-btn">HTMLを取得</button>
+            <button id="toggle-mode-btn">切替: 直接取得</button>
+            <span id="current-mode">現在: プロキシ使用</span>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">データを読み込み中...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div class="cors-info">
+            <h3>CORSについての注意</h3>
+            <p>ブラウザのセキュリティ制限（CORS）により、JavaScriptから直接他のドメインのコンテンツを取得することはできません。以下の方法があります：</p>
+            <ol>
+                <li><strong>プロキシの使用（推奨・デフォルト）：</strong> CORS Anywhereプロキシを経由してHTMLを取得します。
+                    <div style="background-color: #f0f0f0; padding: 10px; margin-top: 5px; border-radius: 4px;">
+                        上部の「重要: 初回利用時の手順」に従って、CORS Anywhereの一時的なアクセス許可を取得してください。
+                    </div>
+                </li>
+                <li><strong>各ブラウザのCORS制限をオフにする：</strong> 開発目的であれば、ブラウザをCORS制限なしで起動することも可能です。Chromeの場合は、以下のコマンドでブラウザを起動します：<br>
+                <code>open -a "Google Chrome" --args --disable-web-security --user-data-dir="~/ChromeDevSession"</code></li>
+            </ol>
+        </div>
+        
+        <div id="result-container" style="display: none;">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="raw">生HTML</button>
+                <button class="tab-button" data-tab="preview">プレビュー</button>
+            </div>
+            
+            <div class="tab-content active" id="raw-content">
+                <pre id="html-result"></pre>
+            </div>
+            
+            <div class="tab-content" id="preview-content">
+                <div id="person-filter" style="margin-bottom: 15px;">
+                    <label for="person-name">人物名でフィルター:</label>
+                    <input type="text" id="person-name" placeholder="例: ゆうや れいれい" style="width: 200px; padding: 5px; margin-right: 10px;">
+                    <button id="filter-btn" style="background-color: #28a745;">フィルター</button>
+                    <button id="clear-filter-btn" style="background-color: #6c757d;">クリア</button>
+                    <span id="filter-status" style="margin-left: 10px; font-style: italic;"></span>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 5px;">※ スペース区切りで複数の人物名を指定できます</div>
+                </div>
+                <div id="preview-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let useProxy = true; // デフォルトでプロキシモードを有効に
+        
+        // タブ切り替え
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // すべてのタブボタンからアクティブクラスを削除
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // すべてのタブコンテンツを非表示
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // クリックされたタブをアクティブに
+                button.classList.add('active');
+                
+                // 対応するコンテンツを表示
+                const tabId = button.getAttribute('data-tab');
+                document.getElementById(`${tabId}-content`).classList.add('active');
+            });
+        });
+        
+        // プロキシモード切り替え
+        document.getElementById('toggle-mode-btn').addEventListener('click', function() {
+            useProxy = !useProxy;
+            this.textContent = useProxy ? '切替: 直接取得' : '切替: プロキシ使用';
+            document.getElementById('current-mode').textContent = useProxy ? 
+                '現在: プロキシ使用' : 
+                '現在: 直接取得';
+        });
+        
+        // HTMLの取得
+        document.getElementById('fetch-btn').addEventListener('click', async function() {
+            const url = document.getElementById('url-input').value.trim();
+            
+            // 入力チェック
+            if (!url) {
+                showError('URLを入力してください');
+                return;
+            }
+            
+            // URLのバリデーション
+            try {
+                new URL(url);
+            } catch (e) {
+                showError('有効なURLを入力してください');
+                return;
+            }
+            
+            showLoading(true);
+            clearError();
+            clearResult();
+            
+            try {
+                let requestUrl = url;
+                
+                if (useProxy) {
+                    // プロキシを使用する場合
+                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                    requestUrl = proxyUrl + url;
+                }
+                
+                const response = await fetch(requestUrl, {
+                    mode: useProxy ? 'cors' : 'no-cors',
+                    headers: {
+                        'Accept': 'text/html'
+                    }
+                });
+                
+                if (useProxy) {
+                    // プロキシ使用モードの場合
+                    if (response.status === 403) {
+                        throw new Error('CORS Anywhereアクセス許可が必要です。ページ上部の「重要: 初回利用時の手順」に従って、許可を取得してください。');
+                    } else if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    // responseからテキストを得る前にShift-JISかどうか確認するため、まずArrayBufferとして取得
+                    const buffer = await response.arrayBuffer();
+                    const html = await processResponseBuffer(buffer, response);
+                    displayHtml(html);
+                } else {
+                    // 直接取得モードの場合
+                    try {
+                        const buffer = await response.arrayBuffer();
+                        const html = await processResponseBuffer(buffer, response);
+                        displayHtml(html);
+                    } catch (error) {
+                        throw new Error('CORS制限により、直接HTMLを取得できません。プロキシモードに切り替えるか、CORS制限を無効にしたブラウザで試してください。');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'データの取得中にエラーが発生しました。');
+            } finally {
+                showLoading(false);
+            }
+        });
+        
+        // ArrayBufferからHTMLテキストを適切なエンコーディングで取得
+        async function processResponseBuffer(buffer, response) {
+            // Content-Typeヘッダーからエンコーディングを取得
+            let encoding = 'utf-8'; // デフォルトはUTF-8
+            const contentType = response.headers.get('Content-Type');
+            
+            if (contentType) {
+                const charsetMatch = contentType.match(/charset=([^;]+)/i);
+                if (charsetMatch && charsetMatch[1]) {
+                    encoding = charsetMatch[1].trim().toLowerCase();
+                }
+            }
+            
+            // HTMLからmeta charsetタグを探してエンコーディングを確認
+            let decoder = new TextDecoder('utf-8');
+            const previewText = decoder.decode(buffer.slice(0, 1024)); // 最初の1KBだけデコード
+            
+            const metaCharsetMatch = previewText.match(/<meta[^>]+charset=["']?([^"'>]+)/i);
+            if (metaCharsetMatch && metaCharsetMatch[1]) {
+                encoding = metaCharsetMatch[1].trim().toLowerCase();
+            }
+            
+            // Shift-JIS系の場合は正規化
+            if (encoding === 'shift-jis' || encoding === 'shift_jis' || encoding === 'sjis' || encoding === 'cp932' || encoding === 'windows-31j') {
+                encoding = 'shift_jis';
+            }
+            
+            console.log(`Detected encoding: ${encoding}`);
+            
+            try {
+                // 適切なエンコーディングでデコード
+                decoder = new TextDecoder(encoding);
+                let html = decoder.decode(buffer);
+                
+                // エンコーディング指定をUTF-8に変更
+                html = html.replace(/(<meta[^>]+charset=["']?)([^"'>]+)/gi, '$1utf-8');
+                
+                return html;
+            } catch (error) {
+                console.error('Error decoding content:', error);
+                // エラーの場合はUTF-8でフォールバック
+                decoder = new TextDecoder('utf-8');
+                return decoder.decode(buffer);
+            }
+        }
+        
+        function displayHtml(html) {
+            // 結果コンテナを表示
+            document.getElementById('result-container').style.display = 'block';
+            
+            document.getElementById('html-result').textContent = html;
+            
+            // プレビューを表示
+            const previewDiv = document.getElementById('preview-result');
+            previewDiv.innerHTML = html;
+            
+            // プレビュー内のスクリプトを無効化
+            previewDiv.querySelectorAll('script').forEach(script => {
+                script.remove();
+            });
+            
+            // 外部CSSファイルを取得して適用
+            const originalUrl = document.getElementById('url-input').value.trim();
+            loadExternalCSS(previewDiv, originalUrl);
+            
+            // HTMLの相対URLを絶対URLに変換
+            fixRelativeUrlsInHtml(previewDiv, originalUrl);
+            
+            // 人物フィルター機能の設定
+            setupPersonFilter();
+        }
+        
+        // 外部CSSファイルを取得して適用する
+        async function loadExternalCSS(previewDiv, originalUrl) {
+            try {
+                // 元のURLからベースURLを取得
+                const baseUrl = new URL(originalUrl);
+                const baseOrigin = baseUrl.origin;
+                const basePath = baseUrl.pathname.substring(0, baseUrl.pathname.lastIndexOf('/') + 1);
+                
+                // プレビュー内のlinkタグを探す
+                const linkTags = previewDiv.querySelectorAll('link[rel="stylesheet"]');
+                
+                // 各linkタグのhref属性からCSSファイルのURLを取得し、CSSを読み込む
+                for(const linkTag of linkTags) {
+                    try {
+                        const href = linkTag.getAttribute('href');
+                        if(!href) continue;
+                        
+                        // 相対URLと絶対URLを処理
+                        let fullCssUrl = '';
+                        if(href.startsWith('http://') || href.startsWith('https://')) {
+                            // 絶対URL
+                            fullCssUrl = href;
+                        } else if(href.startsWith('/')) {
+                            // ルート相対パス
+                            fullCssUrl = `${baseOrigin}${href}`;
+                        } else {
+                            // 相対パス
+                            fullCssUrl = `${baseOrigin}${basePath}${href}`;
+                        }
+                        
+                        console.log(`Loading CSS from: ${fullCssUrl}`);
+                        
+                        // プロキシ経由でCSSを取得
+                        let cssUrl = fullCssUrl;
+                        if(useProxy) {
+                            const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                            cssUrl = proxyUrl + fullCssUrl;
+                        }
+                        
+                        const cssResponse = await fetch(cssUrl, {
+                            mode: useProxy ? 'cors' : 'no-cors',
+                            headers: {
+                                'Accept': 'text/css'
+                            }
+                        });
+                        
+                        if(cssResponse.ok) {
+                            // ArrayBufferとして取得してエンコーディング処理
+                            const buffer = await cssResponse.arrayBuffer();
+                            const cssText = await processCSSBuffer(buffer, cssResponse);
+                            
+                            // 既存のlinkタグの代わりにstyleタグでCSSを適用
+                            const styleTag = document.createElement('style');
+                            styleTag.textContent = cssText;
+                            linkTag.parentNode.replaceChild(styleTag, linkTag);
+                            
+                            console.log(`CSS loaded and applied: ${fullCssUrl}`);
+                        } else {
+                            console.error(`Failed to load CSS: ${fullCssUrl}, status: ${cssResponse.status}`);
+                        }
+                    } catch(cssError) {
+                        console.error('Error loading CSS:', cssError);
+                    }
+                }
+                
+                // style要素内で指定された画像やフォントのURLも置き換え
+                fixRelativeUrlsInStyles(previewDiv, baseOrigin, basePath);
+                
+            } catch(error) {
+                console.error('Error processing CSS:', error);
+            }
+        }
+        
+        // CSSファイルのArrayBufferを適切にデコードする
+        async function processCSSBuffer(buffer, response) {
+            // Content-Typeヘッダーからエンコーディングを取得
+            let encoding = 'utf-8'; // デフォルトはUTF-8
+            const contentType = response.headers.get('Content-Type');
+            
+            if (contentType) {
+                const charsetMatch = contentType.match(/charset=([^;]+)/i);
+                if (charsetMatch && charsetMatch[1]) {
+                    encoding = charsetMatch[1].trim().toLowerCase();
+                }
+            }
+            
+            // Shift-JIS系の場合は正規化
+            if (encoding === 'shift-jis' || encoding === 'shift_jis' || encoding === 'sjis' || encoding === 'cp932' || encoding === 'windows-31j') {
+                encoding = 'shift_jis';
+            }
+            
+            console.log(`CSS encoding: ${encoding}`);
+            
+            try {
+                // 適切なエンコーディングでデコード
+                const decoder = new TextDecoder(encoding);
+                return decoder.decode(buffer);
+            } catch (error) {
+                console.error('Error decoding CSS:', error);
+                // エラーの場合はUTF-8でフォールバック
+                const decoder = new TextDecoder('utf-8');
+                return decoder.decode(buffer);
+            }
+        }
+        
+        // style要素内の相対URLを絶対URLに変換
+        function fixRelativeUrlsInStyles(previewDiv, baseOrigin, basePath) {
+            const styleElements = previewDiv.querySelectorAll('style');
+            
+            styleElements.forEach(style => {
+                let cssText = style.textContent;
+                
+                // CSSのurl()関数内の相対パスを絶対パスに変換
+                cssText = cssText.replace(/url\((['"]?)([^'")\s]+)(['"]?)\)/g, (match, quote1, url, quote2) => {
+                    // 既に絶対URLの場合はそのまま
+                    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+                        return match;
+                    }
+                    // ルート相対パスの場合
+                    else if (url.startsWith('/')) {
+                        return `url(${quote1}${baseOrigin}${url}${quote2})`;
+                    }
+                    // 相対パスの場合
+                    else {
+                        return `url(${quote1}${baseOrigin}${basePath}${url}${quote2})`;
+                    }
+                });
+                
+                style.textContent = cssText;
+            });
+        }
+        
+        // HTMLの相対URLを絶対URLに変換
+        function fixRelativeUrlsInHtml(previewDiv, originalUrl) {
+            try {
+                // 元のURLからベースURLを取得
+                const baseUrl = new URL(originalUrl);
+                const baseOrigin = baseUrl.origin;
+                const basePath = baseUrl.pathname.substring(0, baseUrl.pathname.lastIndexOf('/') + 1);
+                
+                // 画像のsrc属性
+                previewDiv.querySelectorAll('img').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+                        if (src.startsWith('/')) {
+                            img.src = `${baseOrigin}${src}`;
+                        } else {
+                            img.src = `${baseOrigin}${basePath}${src}`;
+                        }
+                    }
+                });
+                
+                // その他のリソース要素（iframe, audio, video, embed, objectなど）
+                // iframeのsrc属性
+                previewDiv.querySelectorAll('iframe').forEach(iframe => {
+                    const src = iframe.getAttribute('src');
+                    if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+                        if (src.startsWith('/')) {
+                            iframe.src = `${baseOrigin}${src}`;
+                        } else {
+                            iframe.src = `${baseOrigin}${basePath}${src}`;
+                        }
+                    }
+                });
+                
+                // audio/videoのsrc属性
+                previewDiv.querySelectorAll('audio, video').forEach(media => {
+                    const src = media.getAttribute('src');
+                    if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+                        if (src.startsWith('/')) {
+                            media.src = `${baseOrigin}${src}`;
+                        } else {
+                            media.src = `${baseOrigin}${basePath}${src}`;
+                        }
+                    }
+                    
+                    // source要素のsrc属性
+                    media.querySelectorAll('source').forEach(source => {
+                        const sourceSrc = source.getAttribute('src');
+                        if (sourceSrc && !sourceSrc.startsWith('data:') && !sourceSrc.startsWith('http://') && !sourceSrc.startsWith('https://')) {
+                            if (sourceSrc.startsWith('/')) {
+                                source.src = `${baseOrigin}${sourceSrc}`;
+                            } else {
+                                source.src = `${baseOrigin}${basePath}${sourceSrc}`;
+                            }
+                        }
+                    });
+                });
+                
+                // embedのsrc属性
+                previewDiv.querySelectorAll('embed').forEach(embed => {
+                    const src = embed.getAttribute('src');
+                    if (src && !src.startsWith('data:') && !src.startsWith('http://') && !src.startsWith('https://')) {
+                        if (src.startsWith('/')) {
+                            embed.src = `${baseOrigin}${src}`;
+                        } else {
+                            embed.src = `${baseOrigin}${basePath}${src}`;
+                        }
+                    }
+                });
+                
+                // objectのdata属性
+                previewDiv.querySelectorAll('object').forEach(obj => {
+                    const data = obj.getAttribute('data');
+                    if (data && !data.startsWith('data:') && !data.startsWith('http://') && !data.startsWith('https://')) {
+                        if (data.startsWith('/')) {
+                            obj.data = `${baseOrigin}${data}`;
+                        } else {
+                            obj.data = `${baseOrigin}${basePath}${data}`;
+                        }
+                    }
+                });
+                
+                // aタグのhref属性（任意、動作に影響するため必要に応じて）
+                previewDiv.querySelectorAll('a').forEach(a => {
+                    const href = a.getAttribute('href');
+                    if (href && !href.startsWith('#') && !href.startsWith('javascript:') && 
+                        !href.startsWith('mailto:') && !href.startsWith('tel:') && 
+                        !href.startsWith('http://') && !href.startsWith('https://')) {
+                        
+                        if (href.startsWith('/')) {
+                            a.href = `${baseOrigin}${href}`;
+                        } else {
+                            a.href = `${baseOrigin}${basePath}${href}`;
+                        }
+                        
+                        // 外部リンクを新しいタブで開くように設定（任意）
+                        a.setAttribute('target', '_blank');
+                    }
+                });
+                
+                console.log('HTML相対URLを絶対URLに変換しました');
+            } catch(error) {
+                console.error('HTMLの相対URL変換中にエラーが発生しました:', error);
+            }
+        }
+        
+        function showLoading(isLoading) {
+            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function clearError() {
+            document.getElementById('error').style.display = 'none';
+        }
+        
+        function clearResult() {
+            document.getElementById('html-result').textContent = '';
+            document.getElementById('preview-result').innerHTML = '';
+            document.getElementById('result-container').style.display = 'none';
+        }
+        
+        // 人物名でフィルタリングする機能
+        function setupPersonFilter() {
+            const filterBtn = document.getElementById('filter-btn');
+            const clearFilterBtn = document.getElementById('clear-filter-btn');
+            const personNameInput = document.getElementById('person-name');
+            const filterStatus = document.getElementById('filter-status');
+            const previewDiv = document.getElementById('preview-result');
+            
+            // フィルターボタンのクリックイベント
+            filterBtn.addEventListener('click', function() {
+                const personName = personNameInput.value.trim();
+                if (!personName) {
+                    filterStatus.textContent = '人物名を入力してください';
+                    return;
+                }
+                
+                filterByPersonName(personName);
+            });
+            
+            // クリアボタンのクリックイベント
+            clearFilterBtn.addEventListener('click', function() {
+                personNameInput.value = '';
+                clearPersonFilter();
+            });
+            
+            // Enterキーでもフィルター実行
+            personNameInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const personName = personNameInput.value.trim();
+                    if (personName) {
+                        filterByPersonName(personName);
+                    }
+                }
+            });
+            
+            // フィルター機能の実装
+            function filterByPersonName(name) {
+                const previewDiv = document.getElementById('preview-result');
+                let matchCount = 0;
+                
+                // スペースで区切って複数の名前で検索できるようにする
+                const searchNames = name.split(/\s+/).filter(n => n.trim() !== '');
+                
+                if (searchNames.length === 0) {
+                    filterStatus.textContent = '人物名を入力してください';
+                    return;
+                }
+                
+                // コメント部分のフィルタリング
+                const commentTables = previewDiv.querySelectorAll('.usercommentlist table');
+                commentTables.forEach(table => {
+                    const nameLabel = table.querySelector('.user-name label');
+                    if (nameLabel) {
+                        const tableName = nameLabel.textContent;
+                        // いずれかの名前に一致するか確認
+                        const matched = searchNames.some(searchName => tableName.includes(searchName));
+                        if (matched) {
+                            table.style.display = '';
+                            matchCount++;
+                        } else {
+                            table.style.display = 'none';
+                        }
+                    }
+                });
+                
+                // スケジュール部分のフィルタリング
+                const scheduleTables = previewDiv.querySelectorAll('.schedulelist .tablestyle-03');
+                scheduleTables.forEach(table => {
+                    const nameDiv = table.querySelector('.user .nowrap');
+                    if (nameDiv) {
+                        const tableName = nameDiv.textContent;
+                        // いずれかの名前に一致するか確認
+                        const matched = searchNames.some(searchName => tableName.includes(searchName));
+                        if (matched) {
+                            table.style.display = '';
+                            matchCount++;
+                        } else {
+                            table.style.display = 'none';
+                        }
+                    }
+                });
+                
+                // 日付とタイムラインのヘッダー部分は常に表示
+                const headerTables = previewDiv.querySelectorAll('.schedulelist .tablestyle-01');
+                headerTables.forEach(table => {
+                    table.style.display = '';
+                });
+                
+                // マッチ結果の表示
+                if (matchCount > 0) {
+                    if (searchNames.length > 1) {
+                        filterStatus.textContent = `${searchNames.map(n => `「${n}」`).join(' または ')}に一致する${matchCount}件を表示しています`;
+                    } else {
+                        filterStatus.textContent = `「${searchNames[0]}」に一致する${matchCount}件を表示しています`;
+                    }
+                    filterStatus.style.color = '#28a745';
+                } else {
+                    if (searchNames.length > 1) {
+                        filterStatus.textContent = `指定された人物名に一致する項目が見つかりませんでした`;
+                    } else {
+                        filterStatus.textContent = `「${searchNames[0]}」に一致する項目が見つかりませんでした`;
+                    }
+                    filterStatus.style.color = '#dc3545';
+                }
+            }
+            
+            // フィルターのクリア
+            function clearPersonFilter() {
+                const previewDiv = document.getElementById('preview-result');
+                
+                // すべての要素を表示
+                const allTables = previewDiv.querySelectorAll('.usercommentlist table, .schedulelist table');
+                allTables.forEach(table => {
+                    table.style.display = '';
+                });
+                
+                filterStatus.textContent = 'フィルターをクリアしました';
+                filterStatus.style.color = '#6c757d';
+            }
+        }
+    </script>
+</body>
+</html> 
